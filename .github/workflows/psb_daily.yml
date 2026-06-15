@@ -1,0 +1,57 @@
+# pSB Daily Report — GitHub Actions Workflow
+#
+# SETUP: Gmail App Password
+# ──────────────────────────────────────────────────────────────────────────────
+# 1. In your Google Account go to:
+#    Security → 2-Step Verification (must be ON) → App passwords
+#    https://myaccount.google.com/apppasswords
+#
+# 2. Create a new App Password:
+#    App name: "pSB Report" → click Generate
+#    Copy the 16-character password shown (e.g. "abcd efgh ijkl mnop")
+#
+# 3. Add both values as GitHub repository secrets:
+#    Repo → Settings → Secrets and variables → Actions → New repository secret
+#
+#    Name: GMAIL_ADDRESS     Value: youraddress@gmail.com
+#    Name: GMAIL_APP_PASSWORD  Value: abcdefghijklmnop  (no spaces)
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: pSB Daily Report
+
+on:
+  schedule:
+    # 2:00 PM ET = 18:00 UTC (during EDT, April–October)
+    - cron: '0 18 * * *'
+  workflow_dispatch:   # allows manual trigger from GitHub UI
+
+jobs:
+  run-report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run pSB report and send email
+        env:
+          GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
+        run: python psb_daily.py
+
+      - name: Upload HTML preview as artifact
+        if: always()   # save artifact even if email step fails
+        uses: actions/upload-artifact@v4
+        with:
+          name: psb-report-${{ github.run_id }}
+          path: output/preview.html
+          retention-days: 7
